@@ -1,0 +1,267 @@
+#! /usr/bin/env python3
+
+# IMPORTS
+
+import argparse as ap
+import typing as tp
+import sys
+
+from typing import Final as F, Literal, TypeAlias
+
+
+
+# TYPES AND THEIR VALUES
+
+t_block_name   : TypeAlias = Literal[
+    'cbm', 'extended', 'supplement', 'for-symbols', 'half-marks',
+]
+t_output_type  : TypeAlias = Literal[
+    'text', 'LaTeX', 'XeLaTeX', 'LuaLaTeX',
+]
+t_font_version : TypeAlias = Literal[
+    '0.043', '0.044', '0.045', '0.046', '0.047', '0.048', '0.049',
+]
+t_font_style   : TypeAlias = Literal[
+    'Regular',   'RegularItalic',
+    'Light',     'LightItalic',
+    'Medium',    'MediumItalic',
+    'SemiBold',  'SemiBoldItalic',
+    'Bold',      'BoldItalic',
+    'ExtraBold', 'ExtraBoldItalic',
+    'Black',     'BlackItalic',
+]
+
+block_names   : F[tuple[t_block_name]]   = tp.get_args(t_block_name)
+output_types  : F[tuple[t_output_type]]  = tp.get_args(t_output_type)
+font_versions : F[tuple[t_font_version]] = tp.get_args(t_font_version)
+font_styles   : F[tuple[t_font_style]]   = tp.get_args(t_font_style)
+
+t_block_name_choice   : TypeAlias = Literal[t_block_name,   'all']
+t_output_type_choice  : TypeAlias = Literal[t_output_type,  'all']
+t_font_version_choice : TypeAlias = Literal[t_font_version, 'all']
+t_font_style_choice   : TypeAlias = Literal[t_font_style,   'all']
+
+block_name_choices   : F[tuple[t_block_name_choice]]   =\
+    tp.get_args(t_block_name_choice)
+output_type_choices  : F[tuple[t_output_type_choice]]  =\
+    tp.get_args(t_output_type_choice)
+font_version_choices : F[tuple[t_font_version_choice]] =\
+    tp.get_args(t_font_version_choice)
+font_style_choices   : F[tuple[t_font_style_choice]]   =\
+    tp.get_args(t_font_style_choice)
+
+
+
+# CONVENIENCES
+
+def format_unicode_code_point(dec_code_point: int) -> str:
+    # strip out Python's ‘0x’ prefix for hex number presentations
+    hex_str : F[str] = hex(dec_code_point)[2:]
+    assert len(hex_str) <= 4, hex_str
+    return 'U+' + hex_str.ljust(4, '0').upper()
+
+
+## FUNCTIONS FOR PRODUCING DICTIONARIES
+
+# we use the following functions to define the corresponding dictionaries. we
+# use functions in order to make sure (via type-checking) that each block_name
+# gets a corresponding value in each dictionary (type-checking combined with the
+# way the dictionaries are defined ensures this since type-checking ensures that
+# the functions are total)
+
+def get_full_block_name(block_name: t_block_name) -> str:
+    match block_name:
+        case 'cbm':         return 'Combining Diactricial Marks'
+        case 'extended':    return 'Combining Diactricial Marks Extended'
+        case 'supplement':  return 'Combining Diactricial Marks Supplement'
+        case 'for-symbols': return 'Combining Diacritical Marks for Symbols'
+        case 'half-marks':  return 'Combining Half Marks'
+
+def get_block_range(block_name: t_block_name) -> list[int]:
+    match block_name:
+        case 'cbm':         return list(range(0x0300, 0x036F+1))
+        case 'extended':    return list(range(0x1AB0, 0x1ACE+1))
+        case 'supplement':  return list(range(0x1DC0, 0x1DFF+1))
+        case 'for-symbols': return list(range(0x20D0, 0x20F0+1))
+        case 'half-marks':  return list(range(0xFE20, 0xFE2F+1))
+
+def get_wikipedia_URL(block_name: t_block_name) -> str:
+    match block_name:
+        case 'cbm':         return 'https://en.wikipedia.org/wiki/Combining_Diacritical_Marks'
+        case 'extended':    return 'https://en.wikipedia.org/wiki/Combining_Diacritical_Marks_Extended'
+        case 'supplement':  return 'https://en.wikipedia.org/wiki/Combining_Diacritical_Marks_Supplement'
+        case 'for-symbols': return 'https://en.wikipedia.org/wiki/Combining_Diacritical_Marks_for_Symbols'
+        case 'half-marks':  return 'https://en.wikipedia.org/wiki/Combining_Half_Marks'
+
+
+## DICTIONARIES
+
+full_block_name_by_block_name      : F[dict[t_block_name,str]]       =\
+    {n: get_full_block_name(n) for n in block_names}
+dec_range_by_block_name            : F[dict[t_block_name,list[int]]] =\
+    {n: get_block_range(n)     for n in block_names}
+wikipedia_URL_by_block_name        : F[dict[t_block_name,str]]       =\
+    {n: get_wikipedia_URL(n)   for n in block_names}
+unicode_range_as_str_by_block_name : F[dict[t_block_name,str]]       = {
+    n:
+        format_unicode_code_point(dec_range_by_block_name[n][0]) +
+        '—' +
+        format_unicode_code_point(dec_range_by_block_name[n][-1])
+    for n in block_names
+}
+
+def get_block_description(block_name: t_block_name) -> str:
+    full_block_name : F[str] = full_block_name_by_block_name[block_name]
+    unicode_range   : F[str] = unicode_range_as_str_by_block_name[block_name]
+    wikipedia_URL   : F[str] = wikipedia_URL_by_block_name[block_name]
+    return\
+        f'{full_block_name} ({unicode_range})' +\
+        '\n' +\
+        wikipedia_URL
+block_description_by_block_name : F[dict[t_block_name,str]] =\
+    {n: get_block_description(n) for n in block_names}
+
+
+# CLI INTERFACE
+
+## DESCRIPTION
+
+cli_description : F[str] =\
+    'Produce examples of how different versions of JuliaMono handles combining marks in various settings.' +\
+    '\n\n\n' +\
+    'A combining marks is a combining character:' +\
+    '\n\n' +\
+    'https://en.wikipedia.org/wiki/Combining_character' +\
+    '\n\n\n' +\
+    'Currently the following blocks of combining marks are supported:' +\
+    '\n\n' +\
+    '\n\n'.join(block_description_by_block_name[n] for n in block_names) +\
+    '\n'
+
+
+## EXAMPLE USAGE
+
+cli_example : F[str] =\
+    'Example usage: TODO'
+
+
+## DEFAULT VALUES
+
+default_block_name   : F[t_block_name]   = 'cbm'
+default_output_type  : F[t_output_type]  = 'text'
+default_font_version : F[t_font_version] = '0.049'
+default_font_style   : F[t_font_style]   = 'Regular'
+
+
+## THE ARGUMENT PARSER
+
+arg_parser : F[ap.ArgumentParser] = ap.ArgumentParser(
+    description=cli_description, epilog=cli_example,
+    formatter_class=ap.RawTextHelpFormatter
+)
+arg_parser.add_argument(
+    'characters', type=str, help='characters to combine marks with'
+)
+arg_parser.add_argument(
+    '--block', choices=block_name_choices, default=default_block_name,
+    help=(
+        f'\nUnicode block(s) (optional, default: {default_block_name})\n'
+        +
+        '\n'.join(
+            f'\n{n}:\n{full_block_name_by_block_name[n]}' for n in block_names
+        )
+        +
+        '\n\n'
+    )
+)
+arg_parser.add_argument(
+    '--font-version', choices=font_version_choices,
+    default=default_font_version,
+    help=f'''
+font version(s) (default: {default_font_version})
+(has no if effect if --out txt is passed (the defaut))
+
+'''
+)
+arg_parser.add_argument(
+    '--font-style', choices=font_style_choices, default=default_font_style,
+    help=f'''
+font style(s) (default: {default_font_version})
+(has no if effect if --out txt is passed (the default))
+
+'''
+)
+arg_parser.add_argument(
+    '--out', choices=output_type_choices, default=default_output_type,
+    help=f'''
+output type(s) (default: {default_output_type})
+TODO: output destinations
+
+'''
+)
+arg_parser.add_argument(
+    '--overwrite', action='store_true', default=False,
+    help='overwrite existing output destinations'
+)
+
+
+## PARSE ARGS
+
+args : F = arg_parser.parse_args()
+
+chrs                : F[str]                   = args.characters
+block_choice        : F[t_block_name_choice]   = args.block
+font_style_choice   : F[t_font_style_choice]   = args.font_style
+font_version_choice : F[t_font_version_choice] = args.font_version
+output_type_choice  : F[t_output_type_choice]  = args.out
+overwrite           : F[bool]                  = args.overwrite
+
+
+
+# PRODUCE OUTPUT
+
+excluded_code_points : F[list[int]] = [
+    0x034F, # U+034F Combining grapheme joiner
+]
+
+def print_text_tables(block_choice: t_block_name_choice, chrs: str) -> None:
+    if block_choice == 'all':
+        for i, block_name in enumerate(block_names):
+            if i != 0:
+                print()
+                print()
+            print_text_tables(block_name, chrs)
+        return
+    full_block_name : F[str] = full_block_name_by_block_name[block_choice]
+    print('═'*len(full_block_name))
+    print(full_block_name)
+    print('═'*len(full_block_name))
+    print()
+    for i, c in enumerate(chrs):
+        if i != 0:
+            print()
+        print_text_table(block_choice, ord(c))
+
+
+def print_text_table(block_name: t_block_name, chr_dec_code_point: int) -> None:
+        c : F[str] = chr(chr_dec_code_point)
+        print(' '*6 + '│' + ' 0 1 2 3 4 5 6 7 8 9 A B C D E F')
+        print('─'*6 + '┼' + '─'*0x10*2, end='')
+        dec_code_points : F[list[int]] = dec_range_by_block_name[block_name]
+        for j, dec_code_point in enumerate(dec_code_points):
+            if j % 0x10 == 0:
+                print()
+                unicode_str : F[str] = format_unicode_code_point(dec_code_point)
+                print(unicode_str[:-1] + 'x│', end='')
+            if dec_code_point in excluded_code_points:
+                print('  ', end='')
+            else:
+                print(' ' + c + chr(dec_code_point), end='')
+        print()
+
+match output_type_choice:
+    case 'text':
+        print_text_tables(block_choice, chrs)
+    case _:
+        print(f'Output type {output_type_choice} not implemented.')
+        sys.exit(1)
