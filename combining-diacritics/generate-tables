@@ -71,9 +71,9 @@ def format_unicode_code_point(dec_code_point: int) -> str:
 
 def get_full_block_name(block_name: t_block_name) -> str:
     match block_name:
-        case 'cbm':         return 'Combining Diactricial Marks'
-        case 'extended':    return 'Combining Diactricial Marks Extended'
-        case 'supplement':  return 'Combining Diactricial Marks Supplement'
+        case 'cbm':         return 'Combining Diacritical Marks'
+        case 'extended':    return 'Combining Diacritical Marks Extended'
+        case 'supplement':  return 'Combining Diacritical Marks Supplement'
         case 'for-symbols': return 'Combining Diacritical Marks for Symbols'
         case 'half-marks':  return 'Combining Half Marks'
 
